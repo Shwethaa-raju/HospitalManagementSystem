@@ -1,0 +1,22 @@
+syntax = "proto3";
+option java_multiple_files = true;
+option java_package = "doctor";
+
+service DoctorService {
+  rpc GetDoctorSchedule (DoctorScheduleRequest) returns (DoctorScheduleResponse);
+}
+
+message DoctorScheduleRequest {
+  string speciality = 1;
+  string date = 2;
+}
+
+message DoctorScheduleResponse {
+  repeated Slot slots = 1;
+}
+
+message Slot {
+  string doctor_id = 1;    // UUID
+  string start_time = 2;
+  string end_time = 3;
+}
