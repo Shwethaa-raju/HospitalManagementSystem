@@ -1,6 +1,7 @@
 package com.hms.appointmentservice.grpc;
 
 import doctor.DoctorScheduleRequest;
+import doctor.DoctorSlotRequest;
 import doctor.DoctorScheduleResponse;
 import doctor.DoctorServiceGrpc;
 import io.grpc.ManagedChannel;
@@ -11,6 +12,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.UUID;
 
 @Service
 public class DoctorServiceGrpcClient {
@@ -28,13 +31,18 @@ public class DoctorServiceGrpcClient {
     }
 
     public DoctorScheduleResponse getAllSlots(String speciality, String date){
-        log.info("date : {}", date.toString() );
-
-//        DoctorScheduleRequest request = DoctorScheduleRequest.newBuilder().setSpeciality(speciality).setDate(date.toString()).build();
         DoctorScheduleRequest request = DoctorScheduleRequest.newBuilder().setSpeciality(speciality).setDate(date).build();
 
         DoctorScheduleResponse response = blockingStub.getDoctorSchedule(request);
-        log.info("received response from doctor service via grpc : {}", response );
+        return response;
+    }
+
+    public DoctorScheduleResponse getDoctorSlots(UUID doctorId, LocalDate date){
+        DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+        String dateStr = date.format(DATE_FORMATTER);
+        DoctorSlotRequest request =  DoctorSlotRequest.newBuilder().setDoctorId(doctorId.toString()).setDate(dateStr).build();
+
+        DoctorScheduleResponse response = blockingStub.getDoctorSlots(request);
         return response;
     }
 

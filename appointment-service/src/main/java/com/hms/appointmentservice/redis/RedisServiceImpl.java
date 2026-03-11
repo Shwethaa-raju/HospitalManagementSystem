@@ -15,10 +15,11 @@ import java.util.UUID;
 @Service
 public class RedisServiceImpl implements RedisService{
     private final StringRedisTemplate redisTemplate;
-    private static final Duration RESERVATION_TTL = Duration.ofMinutes(10);
+    private static final Duration RESERVATION_TTL = Duration.ofMinutes(20);
 
     public RedisServiceImpl(StringRedisTemplate redisTemplate) {
         this.redisTemplate = redisTemplate;
+        System.out.println("Redis host: " + redisTemplate.getConnectionFactory());
     }
 
     @Override
@@ -42,26 +43,6 @@ public class RedisServiceImpl implements RedisService{
         return allSlots;
     }
 
-    private String buildPattern(UUID doctorId, LocalDate date) {
-        return String.format("reserve-%s-%s-*-*", doctorId, date);
-    }
-
-    private Slot extractSlotTime(String redisKey) {
-        String[] parts = redisKey.split("-");
-
-        // parts[0] = reserve
-        // parts[1] = doctorId
-        // parts[2] = date
-        // parts[3] = startTime
-        // parts[4] = endTime
-
-        UUID doctorId = UUID.fromString(parts[1]);
-        LocalTime startTime = LocalTime.parse(parts[3]);
-        LocalTime endTime = LocalTime.parse(parts[4]);
-
-        return new Slot(doctorId, startTime, endTime);
-    }
-
     @Override
     public boolean reserveSlot(
             UUID doctorId,
@@ -71,7 +52,7 @@ public class RedisServiceImpl implements RedisService{
             UUID patientId
     ){
         String key = String.format(
-                "reserve-%s-%s-%s-%s",
+                "reserve=%s=%s=%s=%s",
                 doctorId,
                 date,
                 startTime,
@@ -99,5 +80,25 @@ public class RedisServiceImpl implements RedisService{
     @Override
     public void removeReservation(String reservationKey) {
         redisTemplate.delete(reservationKey);
+    }
+
+    private String buildPattern(UUID doctorId, LocalDate date) {
+        return String.format("reserve=%s=%s=*=*", doctorId, date);
+    }
+
+    private Slot extractSlotTime(String redisKey) {
+        String[] parts = redisKey.split("=");
+
+        // parts[0] = reserve
+        // parts[1] = doctorId
+        // parts[2] = date
+        // parts[3] = startTime
+        // parts[4] = endTime
+
+        UUID doctorId = UUID.fromString(parts[1]);
+        LocalTime startTime = LocalTime.parse(parts[3]);
+        LocalTime endTime = LocalTime.parse(parts[4]);
+
+        return new Slot(doctorId, startTime, endTime);
     }
 }

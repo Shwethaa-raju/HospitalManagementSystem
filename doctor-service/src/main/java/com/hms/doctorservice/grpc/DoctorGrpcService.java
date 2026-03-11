@@ -2,9 +2,11 @@ package com.hms.doctorservice.grpc;
 
 import com.hms.doctorservice.service.DoctorService;
 import doctor.DoctorScheduleRequest;
+import doctor.DoctorSlotRequest;
 import doctor.DoctorScheduleResponse;
 import doctor.DoctorServiceGrpc;
 
+import doctor.Slot;
 import io.grpc.stub.StreamObserver;
 import net.devh.boot.grpc.server.service.GrpcService;
 
@@ -13,6 +15,7 @@ import java.util.List;
 
 
 import java.time.format.DateTimeFormatter;
+import java.util.UUID;
 //import java.time.format.DateTimeParseException;
 
 
@@ -37,8 +40,30 @@ public class DoctorGrpcService extends DoctorServiceGrpc.DoctorServiceImplBase {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
         LocalDate date = LocalDate.parse(request.getDate(), formatter);
 
-        // call your domain/service layer
         List<com.hms.doctorservice.dto.Slot> slots = doctorService.getAllSlots( request.getSpeciality(), date );
+
+        DoctorScheduleResponse response =
+                DoctorScheduleResponse.newBuilder()
+                        .addAllSlots(
+                                slots.stream()
+                                        .map(this::toProtoSlot)
+                                        .toList()
+                        )
+                        .build();
+
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void getDoctorSlots( DoctorSlotRequest request, StreamObserver<DoctorScheduleResponse> responseObserver) {
+
+        UUID doctorId = UUID.fromString(request.getDoctorId());
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+        LocalDate date = LocalDate.parse(request.getDate(), formatter);
+
+        List<com.hms.doctorservice.dto.Slot> slots = doctorService.getSlotsForDoctor(doctorId, date);
 
         DoctorScheduleResponse response =
                 DoctorScheduleResponse.newBuilder()

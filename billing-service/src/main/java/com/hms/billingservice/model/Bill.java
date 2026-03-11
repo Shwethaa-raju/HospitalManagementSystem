@@ -3,6 +3,7 @@ package com.hms.billingservice.model;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.bson.types.ObjectId;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -15,7 +16,7 @@ public class Bill {
     @Id
     private UUID id;
 
-    private UUID prescriptionId;
+    private ObjectId prescriptionId;
 
     private UUID appointmentId;
 
@@ -31,7 +32,7 @@ public class Bill {
         return id;
     }
 
-    public UUID getPrescriptionId() {
+    public ObjectId getPrescriptionId() {
         return prescriptionId;
     }
 
@@ -59,7 +60,7 @@ public class Bill {
         this.id = id;
     }
 
-    public void setPrescriptionId(UUID prescriptionId) {
+    public void setPrescriptionId(ObjectId prescriptionId) {
         this.prescriptionId = prescriptionId;
     }
 

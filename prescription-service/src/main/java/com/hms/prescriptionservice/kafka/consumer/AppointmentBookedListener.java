@@ -18,7 +18,9 @@ public class AppointmentBookedListener {
             groupId = "prescription-service"
     )
     public void consumeAppointmentBookedTopic(AppointmentBookedEvent event) {
-        prescriptionService.generateRandomPrescription(event.getAppointmentId());
+        System.out.println("Received event: " + event.getAppointmentId());
+
+        prescriptionService.generateRandomPrescription(event.getAppointmentId(), event.getDoctorId(), event.getPatientId());
     }
 
 }

@@ -1,9 +1,14 @@
 package com.pm.patientservice.exception;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+
+import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -45,5 +50,16 @@ public class GlobalExceptionHandler {
     Map<String, String> errors = new HashMap<>();
     errors.put("message", "Patient not found");
     return ResponseEntity.badRequest().body(errors);
+  }
+
+  @ExceptionHandler(ConstraintViolationException.class)
+  public ResponseEntity<?> handleConstraintViolation(ConstraintViolationException ex) {
+
+    List<String> errors = ex.getConstraintViolations()
+            .stream()
+            .map(v -> v.getMessage())
+            .toList();
+
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errors);
   }
 }

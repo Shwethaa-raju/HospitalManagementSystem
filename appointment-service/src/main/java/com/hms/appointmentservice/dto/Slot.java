@@ -1,6 +1,7 @@
 package com.hms.appointmentservice.dto;
 
 import java.time.LocalTime;
+import java.util.Objects;
 import java.util.UUID;
 
 public class Slot {
@@ -50,5 +51,15 @@ public class Slot {
                 "start=" + start +
                 ", end=" + end +
                 '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Slot slot)) return false;
+
+        return Objects.equals(doctorId, slot.doctorId) &&
+                Objects.equals(start, slot.start) &&
+                Objects.equals(end, slot.end);
     }
 }

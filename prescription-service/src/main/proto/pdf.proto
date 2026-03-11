@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "pdf";
+
+service PdfService {
+  rpc GeneratePdf (PdfRequest) returns (PdfResponse);
+}
+
+message PdfRequest {
+  string documentId = 1;
+  string documentType = 2;
+  string htmlContent = 3;
+  string fileName = 4;
+}
+
+message PdfResponse {
+  string pdfUrl = 1;
+}

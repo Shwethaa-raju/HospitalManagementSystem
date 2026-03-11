@@ -86,6 +86,8 @@ Thumbs.db
 .aws/
 
 # Application properties
-*/application.properties
+**/application.properties
 
 db_volumnes/
+
+docker-volumes/

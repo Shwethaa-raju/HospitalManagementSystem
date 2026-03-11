@@ -4,10 +4,16 @@ option java_package = "doctor";
 
 service DoctorService {
   rpc GetDoctorSchedule (DoctorScheduleRequest) returns (DoctorScheduleResponse);
+  rpc GetDoctorSlots(DoctorSlotRequest) returns (DoctorScheduleResponse);
 }
 
 message DoctorScheduleRequest {
   string speciality = 1;
+  string date = 2;
+}
+
+message DoctorSlotRequest {
+  string doctorId = 1;
   string date = 2;
 }
 

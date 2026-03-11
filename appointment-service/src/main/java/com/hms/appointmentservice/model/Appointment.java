@@ -36,6 +36,9 @@ public class Appointment {
         this.endTime = endTime;
     }
 
+    public UUID getAppointmentId() { return appointmentId;}
+
+    public void setAppointmentId(UUID appointmentId) { this.appointmentId = appointmentId; }
 
     public UUID getDoctorId() {
         return doctorId;

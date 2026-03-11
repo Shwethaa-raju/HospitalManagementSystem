@@ -1,57 +1,83 @@
 package com.hms.billingservice.service;
 
+import com.hms.billingservice.grpc.PdfServiceGrpcClient;
 import com.hms.billingservice.model.Bill;
 import com.hms.billingservice.model.BillItem;
 import com.hms.billingservice.repository.BillItemRepository;
 import com.hms.billingservice.repository.BillRepository;
-import com.hms.prescriptionservice.model.Prescription;
-import com.hms.prescriptionservice.repository.PrescriptionRepository;
 import jakarta.transaction.Transactional;
+import org.bson.types.ObjectId;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 public class BillingService {
 
-    private final PrescriptionRepository prescriptionRepo; // Mongo
-    private final JdbcTemplate jdbcTemplate;                 // Postgres
+    private final JdbcTemplate jdbcTemplate;
     private final BillRepository billRepo;
     private final BillItemRepository billItemRepo;
+    private final PdfServiceGrpcClient pdfServiceGrpcClient;
+    private final BillHtmlBuilder billHtmlBuilder;
 
     public BillingService(
-            PrescriptionRepository prescriptionRepo,
             JdbcTemplate jdbcTemplate,
             BillRepository billRepo,
-            BillItemRepository billItemRepo) {
-        this.prescriptionRepo = prescriptionRepo;
+            BillItemRepository billItemRepo,
+            PdfServiceGrpcClient pdfServiceGrpcClient,
+            BillHtmlBuilder billHtmlBuilder) {
+
         this.jdbcTemplate = jdbcTemplate;
         this.billRepo = billRepo;
         this.billItemRepo = billItemRepo;
+        this.pdfServiceGrpcClient = pdfServiceGrpcClient;
+        this.billHtmlBuilder = billHtmlBuilder;
+    }
+
+    public void createBill(
+            ObjectId prescriptionId,
+            UUID appointmentId,
+            List<Map<String, Object>> medicines,
+            List<Map<String, Object>> labtests) {
+
+        Bill bill = createBillInDb(prescriptionId, appointmentId, medicines, labtests);
+
+        // Build HTML
+        List<BillItem> items = billItemRepo.findByBillId(bill.getId());
+        String html = billHtmlBuilder.buildBillHtml(bill, items);
+
+        // Call PDF service
+        String pdfUrl = pdfServiceGrpcClient.generatePdf(
+                bill.getId().toString(),
+                "BILL",
+                html,
+                "bill_" + bill.getId() + ".pdf"
+        );
+
+        // Transaction → update bill with PDF URL
+        updateBillPdfUrl(bill.getId(), pdfUrl);
     }
 
     @Transactional
-    public void createBill(UUID prescriptionId) {
-
-        Prescription prescription = prescriptionRepo.findById(prescriptionId)
-                .orElseThrow(() -> new RuntimeException("Prescription not found"));
+    public Bill createBillInDb(
+            ObjectId prescriptionId,
+            UUID appointmentId,
+            List<Map<String, Object>> medicines,
+            List<Map<String, Object>> labtests) {
 
         Bill bill = new Bill();
         bill.setId(UUID.randomUUID());
         bill.setPrescriptionId(prescriptionId);
-        bill.setAppointmentId(prescription.getAppointmentId());
+        bill.setAppointmentId(appointmentId);
         bill.setStatus("CREATED");
 
         List<BillItem> items = new ArrayList<>();
         BigDecimal total = BigDecimal.ZERO;
 
         // ---- MEDICINES ----
-        for (Map<String, Object> med : prescription.getMedicines()) {
+        for (Map<String, Object> med : medicines) {
 
             UUID medicineId = (UUID) med.get("medicineId");
             int days = (int) med.get("days");
@@ -78,7 +104,7 @@ public class BillingService {
         }
 
         // ---- LAB TESTS ----
-        for (Map<String, Object> lab : prescription.getLabTests()) {
+        for (Map<String, Object> lab : labtests) {
 
             UUID labTestId = (UUID) lab.get("labTestId");
 
@@ -108,6 +134,13 @@ public class BillingService {
         billRepo.save(bill);
         billItemRepo.saveAll(items);
 
-//        return bill;
+        return bill;
+    }
+
+    @Transactional
+    public void updateBillPdfUrl(UUID billId, String pdfUrl) {
+
+        Bill bill = billRepo.findById(billId).orElseThrow();
+        bill.setPdfUrl(pdfUrl); // JPA dirty checking will update automatically
     }
 }

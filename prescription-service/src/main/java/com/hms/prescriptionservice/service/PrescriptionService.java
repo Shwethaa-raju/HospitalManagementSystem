@@ -1,33 +1,67 @@
 package com.hms.prescriptionservice.service;
 
+import com.hms.prescriptionservice.grpc.PdfServiceGrpcClient;
 import com.hms.prescriptionservice.kafka.event.PrescriptionCreatedEvent;
+import com.hms.prescriptionservice.kafka.producer.PrescriptionEventProducer;
 import com.hms.prescriptionservice.model.Prescription;
 import com.hms.prescriptionservice.repository.PrescriptionRepository;
+import jakarta.transaction.Transactional;
+import org.bson.types.ObjectId;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 public class PrescriptionService {
+
     private final JdbcTemplate jdbcTemplate;
     private final PrescriptionRepository prescriptionRepository;
-    private final KafkaTemplate<String, PrescriptionCreatedEvent> kafkaTemplate;
+    private final PrescriptionEventProducer prescriptionEventProducer;
+    private final PrescriptionHtmlBuilder prescriptionHtmlBuilder;
+    private final PdfServiceGrpcClient pdfServiceGrpcClient;
 
+    public PrescriptionService(
+            JdbcTemplate jdbcTemplate,
+            PrescriptionRepository prescriptionRepository,
+            PrescriptionEventProducer prescriptionEventProducer,
+            PrescriptionHtmlBuilder prescriptionHtmlBuilder,
+            PdfServiceGrpcClient pdfServiceGrpcClient) {
 
-    public PrescriptionService(JdbcTemplate jdbcTemplate, PrescriptionRepository prescriptionRepository, KafkaTemplate<String, PrescriptionCreatedEvent> kafkaTemplate) {
         this.jdbcTemplate = jdbcTemplate;
         this.prescriptionRepository = prescriptionRepository;
-        this.kafkaTemplate = kafkaTemplate;
+        this.prescriptionEventProducer = prescriptionEventProducer;
+        this.prescriptionHtmlBuilder = prescriptionHtmlBuilder;
+        this.pdfServiceGrpcClient = pdfServiceGrpcClient;
     }
 
-    public void generateRandomPrescription(UUID appointmentId) {
+    public void generateRandomPrescription(UUID appointmentId, UUID doctorId, UUID patientId) {
 
-        // 1. Fetch random medicines
+        // Create prescription in DB
+        Prescription prescription = createPrescriptionInDb(appointmentId, doctorId, patientId);
+
+        // Publish event for billing service
+        publishPrescriptionCreatedEvent(prescription, doctorId, patientId);
+
+        // Generate HTML
+        String html = prescriptionHtmlBuilder.buildHtml(prescription);
+
+        //Call PDF service
+        String pdfUrl = pdfServiceGrpcClient.generatePdf(
+                prescription.getId().toString(),
+                "PRESCRIPTION",
+                html,
+                "prescription_" + prescription.getId() + ".pdf"
+        );
+
+        // Update pdfUrl in DB
+        updatePrescriptionPdfUrl(prescription.getId(), pdfUrl);
+    }
+
+    @Transactional
+    public Prescription createPrescriptionInDb(UUID appointmentId, UUID doctorId, UUID patientId) {
+
+        // Fetch random medicines
         List<UUID> medicineIds = jdbcTemplate.queryForList(
                 """
                 SELECT id FROM medicine
@@ -37,7 +71,7 @@ public class PrescriptionService {
                 UUID.class
         );
 
-        // 2. Fetch random lab tests
+        // Fetch random lab tests
         List<UUID> labTestIds = jdbcTemplate.queryForList(
                 """
                 SELECT id FROM lab_test
@@ -47,7 +81,7 @@ public class PrescriptionService {
                 UUID.class
         );
 
-        // 3. Build medicines payload
+        // Build medicines payload
         List<Map<String, Object>> medicines = medicineIds.stream()
                 .map(id -> {
                     Map<String, Object> m = new HashMap<>();
@@ -58,7 +92,7 @@ public class PrescriptionService {
                 })
                 .toList();
 
-        // 4. Build lab tests payload
+        // Build lab tests payload
         List<Map<String, Object>> labTests = labTestIds.stream()
                 .map(id -> {
                     Map<String, Object> lt = new HashMap<>();
@@ -67,7 +101,6 @@ public class PrescriptionService {
                 })
                 .toList();
 
-        // 5. Create prescription
         Prescription prescription = new Prescription();
         prescription.setAppointmentId(appointmentId);
         prescription.setMedicines(medicines);
@@ -75,23 +108,30 @@ public class PrescriptionService {
 
         prescriptionRepository.save(prescription);
 
-        publishPrescriptionCreatedEvent(prescription);
-
-        // call grpc server in pdfService to create bill pdf
+        return prescription;
     }
 
-    private void publishPrescriptionCreatedEvent(Prescription prescription) {
+    @Transactional
+    public void updatePrescriptionPdfUrl(ObjectId prescriptionId, String pdfUrl) {
+
+        Prescription prescription = prescriptionRepository
+                .findById(prescriptionId)
+                .orElseThrow();
+
+        prescription.setPdfUrl(pdfUrl);
+    }
+
+    private void publishPrescriptionCreatedEvent(Prescription prescription, UUID doctorId, UUID patientId) {
 
         PrescriptionCreatedEvent event = new PrescriptionCreatedEvent();
         event.setPrescriptionId(prescription.getId());
         event.setAppointmentId(prescription.getAppointmentId());
+        event.setPatientId(patientId);
+        event.setDoctorId(doctorId);
+        event.setMedicines(prescription.getMedicines());
+        event.setLabTests(prescription.getLabTests());
+        event.setCreatedAt(prescription.getCreatedAt());
 
-        kafkaTemplate.send(
-                "PRESCRIPTION_CREATED",
-                prescription.getId().toString(),
-                event
-        );
+        prescriptionEventProducer.publishPrescriptionCreated(event);
     }
-
-
 }

@@ -1,4 +1,5 @@
 package com.hms.prescriptionservice.model;
+import org.bson.types.ObjectId;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -9,8 +10,9 @@ import java.util.UUID;
 
 @Document(collection = "prescriptions")
 public class Prescription {
+
     @Id
-    private UUID id;
+    private ObjectId id;
 
     private UUID appointmentId;
     /**
@@ -33,11 +35,13 @@ public class Prescription {
 
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    public UUID getId() {
+    String pdfUrl;
+
+    public ObjectId getId() {
         return id;
     }
 
-    public void setId(UUID id) {
+    public void setId(ObjectId id) {
         this.id = id;
     }
 
@@ -71,5 +75,13 @@ public class Prescription {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getPdfUrl() {
+        return pdfUrl;
+    }
+
+    public void setPdfUrl(String pdfUrl) {
+        this.pdfUrl = pdfUrl;
     }
 }
